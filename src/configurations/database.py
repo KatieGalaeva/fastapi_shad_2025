@@ -1,19 +1,17 @@
 import logging
-
 from typing import AsyncGenerator, Callable, Optional
-from sqlalchemy.ext.asyncio import (
-    AsyncEngine,
-    AsyncSession,
-    async_sessionmaker,
-    create_async_engine,
-)
+
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
 from src.models.base import BaseModel
-from src.configurations.settings import settings
+from src.models.books import Book  # noqa F401
 
-__all__ = ["global_init", "get_async_session", "create_db_and_tables"]
+from .settings import settings
 
 logger = logging.getLogger("__name__")
+
+
+__all__ = ["global_init", "get_async_session", "create_db_and_tables", "delete_db_and_tables"]
 
 __async_engine: Optional[AsyncEngine] = None
 __session_factory: Optional[Callable[[], AsyncSession]] = None
@@ -28,7 +26,7 @@ def global_init() -> None:
         return
 
     if not __async_engine:
-        __async_engine = create_async_engine(url=SQLALCHEMY_DATABASE_URL, echo=True)
+        __async_engine = create_async_engine(url=SQLALCHEMY_DATABASE_URL, echo=False)  # TODO
 
     __session_factory = async_sessionmaker(__async_engine)
 
@@ -37,9 +35,7 @@ async def get_async_session() -> AsyncGenerator:
     global __session_factory
 
     if not __session_factory:
-        raise ValueError(
-            {"message": "You must call global_init() before using this method"}
-        )
+        raise ValueError({"message": "You must call global_init() before using this method."})
 
     session: AsyncSession = __session_factory()
 
@@ -55,15 +51,22 @@ async def get_async_session() -> AsyncGenerator:
 
 
 async def create_db_and_tables():
+    from src.models.sellers import Seller
     from src.models.books import Book
-
     global __async_engine
 
     if __async_engine is None:
-        raise ValueError(
-            {"message": "You must call global_init() before using this method"}
-        )
+        raise ValueError({"message": "You must call global_init() before using this method."})
 
     async with __async_engine.begin() as conn:
-        # await conn.run_sync(BaseModel.metadata.drop_all)
         await conn.run_sync(BaseModel.metadata.create_all)
+
+
+async def delete_db_and_tables():
+    global __async_engine
+
+    if __async_engine is None:
+        raise ValueError({"message": "You must call global_init() before using this method."})
+
+    async with __async_engine.begin() as conn:
+        await conn.run_sync(BaseModel.metadata.drop_all)
