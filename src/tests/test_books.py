@@ -1,33 +1,36 @@
 import pytest
 from sqlalchemy import select
 from src.models.books import Book
+from src.models import books, sellers
 from fastapi import status
 from icecream import ic
 
 
 # Тест на ручку создающую книгу
 @pytest.mark.asyncio
-async def test_create_book(async_client):
-    data = {
-        "title": "Clean Architecture",
-        "author": "Robert Martin",
-        "count_pages": 300,
-        "year": 2025,
-    }
-    response = await async_client.post("/api/v1/books/", json=data)
+async def test_create_book(db_session, async_client):
+    seller = sellers.Seller(
+        first_name="Katie", last_name="Galaeva", email="galaeva@mail.ru", 
+    )
+
+    db_session.add(seller)
+    await db_session.flush()
+
+    book = {"title": "Wrong Code", "author": "Robert Martin", "pages": 104, "year": 2007, "seller_id": seller.id}
+
+    response = await async_client.post("/api/v1/books/", json=book)
 
     assert response.status_code == status.HTTP_201_CREATED
 
     result_data = response.json()
 
-    resp_book_id = result_data.pop("id", None)
-    assert resp_book_id, "Book id not returned from endpoint"
-
     assert result_data == {
-        "title": "Clean Architecture",
+        "id": result_data["id"],
+        "title": "Wrong Code",
         "author": "Robert Martin",
-        "pages": 300,
-        "year": 2025,
+        "pages": 104,
+        "year": 2007,
+        "seller_id": seller.id,
     }
 
 
@@ -36,7 +39,7 @@ async def test_create_book_with_old_year(async_client):
     data = {
         "title": "Clean Architecture",
         "author": "Robert Martin",
-        "count_pages": 300,
+        "pages": 300,
         "year": 1986,
     }
     response = await async_client.post("/api/v1/books/", json=data)
@@ -72,6 +75,7 @@ async def test_get_books(db_session, async_client):
                 "year": 2001,
                 "id": book.id,
                 "pages": 104,
+                "seller_id": None
             },
             {
                 "title": "Mziri",
@@ -79,6 +83,7 @@ async def test_get_books(db_session, async_client):
                 "year": 1997,
                 "id": book_2.id,
                 "pages": 104,
+                "seller_id": None
             },
         ]
     }
@@ -106,6 +111,7 @@ async def test_get_single_book(db_session, async_client):
         "year": 2001,
         "pages": 104,
         "id": book.id,
+        "seller_id": None
     }
 
 
@@ -127,6 +133,7 @@ async def test_update_book(db_session, async_client):
             "pages": 100,
             "year": 2007,
             "id": book.id,
+            "seller_id": None
         },
     )
 
