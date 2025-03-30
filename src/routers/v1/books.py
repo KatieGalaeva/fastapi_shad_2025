@@ -21,14 +21,25 @@ DBSession = Annotated[AsyncSession, Depends(get_async_session)]
 
 # Ручка для создания записи о книге в БД. Возвращает созданную книгу.
 # @books_router.post("/books/", status_code=status.HTTP_201_CREATED)
-# Ручка для создания записи о книге в БД. Возвращает созданную книгу.
-@books_router.post("/", response_model=ReturnedBook, status_code=status.HTTP_201_CREATED) 
-async def create_book(book: IncomingBook, session: DBSession):
-    # прописываем модель валидирующую входные данные и сессию как зависимость.
+@books_router.post(
+    "/", response_model=ReturnedBook, status_code=status.HTTP_201_CREATED
+)  # Прописываем модель ответа
+async def create_book(
+    book: IncomingBook,
+    session: DBSession,
+):  # прописываем модель валидирующую входные данные
+    # session = get_async_session() вместо этого мы используем иньекцию зависимостей DBSession
+
     # это - бизнес логика. Обрабатываем данные, сохраняем, преобразуем и т.д.
     new_book = Book(
-        title=book.title, author=book.author, year=book.year, pages=book.pages, seller_id=book.seller_id
+        **{
+            "title": book.title,
+            "author": book.author,
+            "year": book.year,
+            "pages": book.pages,
+        }
     )
+
     session.add(new_book)
     await session.flush()
 
@@ -38,7 +49,9 @@ async def create_book(book: IncomingBook, session: DBSession):
 # Ручка, возвращающая все книги
 @books_router.get("/", response_model=ReturnedAllbooks)
 async def get_all_books(session: DBSession):
-    query = select(Book)  
+    # Хотим видеть формат
+    # books: [{"id": 1, "title": "blabla", ...., "year": 2023},{...}]
+    query = select(Book)  # SELECT * FROM book
     result = await session.execute(query)
     books = result.scalars().all()
     return {"books": books}
@@ -67,7 +80,7 @@ async def delete_book(book_id: int, session: DBSession):
 # Ручка для обновления данных о книге
 @books_router.put("/{book_id}", response_model=ReturnedBook)
 async def update_book(book_id: int, new_book_data: ReturnedBook, session: DBSession):
-    
+    # Оператор "морж", позволяющий одновременно и присвоить значение и проверить его. Заменяет то, что закомментировано выше.
     if updated_book := await session.get(Book, book_id):
         updated_book.author = new_book_data.author
         updated_book.title = new_book_data.title
